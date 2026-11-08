@@ -1,21 +1,21 @@
 import { verifyPayload, signPayload } from '../../lib/state.js';
 import {
-  exchangeCode, fetchUser, accountAgeDays, finish, authorizeUrl,
+  exchangeCode, fetchUser, accountAgeDays, finish, verifyTurnstile,
 } from '../../lib/discord.js';
+import { config } from '../../lib/config.js';
 import { page } from '../../lib/page.js';
 
 export default async function handler(req, res) {
   const { code, state } = req.query;
+  const data = verifyPayload(state);
 
-  if (!verifyPayload(state) || !code) {
+  if (!data || !code) {
     return res.status(400).send(page(
       'Sesión expirada',
       'Reinicia la verificación desde Discord.',
       '#ff7b7b'
     ));
   }
-
-  const data = verifyPayload(state);
 
   try {
     const token = await exchangeCode(code);
@@ -30,17 +30,16 @@ export default async function handler(req, res) {
     }
 
     const age = accountAgeDays(user);
-    const minAge = Number(process.env.MIN_ACCOUNT_AGE_DAYS || 7);
 
-    if (age < minAge) {
+    if (age < config.minAgeDays) {
       return res.status(403).send(page(
         'Cuenta demasiado nueva',
-        `Tu cuenta tiene ${Math.floor(age)} días y se requieren ${minAge}.`,
+        `Tu cuenta tiene ${Math.floor(age)} días y se requieren ${config.minAgeDays}.`,
         '#ff7b7b'
       ));
     }
 
-    if (process.env.TURNSTILE_SITE_KEY) {
+    if (config.turnstileSite) {
       const carry = signPayload({
         userId: data.userId,
         guildId: data.guildId,
@@ -61,7 +60,7 @@ button{width:100%;margin-top:16px;background:linear-gradient(135deg,#9b5cff,#ff3
 <h1>Último paso</h1><p>Resuelve la verificación anti-bot.</p>
 <form method="POST" action="/api/verify/complete">
 <input type="hidden" name="carry" value="${carry}">
-<div class="cf-turnstile" data-sitekey="${process.env.TURNSTILE_SITE_KEY}"></div>
+<div class="cf-turnstile" data-sitekey="${config.turnstileSite}"></div>
 <button type="submit">Completar</button>
 </form></div>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
