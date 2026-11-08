@@ -1,3 +1,2 @@
 # verify-callback
-Fuck
-A
+Fuck Discord
